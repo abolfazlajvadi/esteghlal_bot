@@ -2,19 +2,88 @@ import os
 import logging
 from flask import Flask, request, jsonify
 import telebot
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 # ---------- تنظیمات اولیه ----------
-TOKEN = os.environ.get('BOT_TOKEN')  # توکن را از محیط می‌خوانیم (در Render تنظیم می‌شود)
+TOKEN = os.environ.get('BOT_TOKEN')
 if not TOKEN:
     raise ValueError("متغیر محیطی BOT_TOKEN تنظیم نشده است!")
 
 bot = telebot.TeleBot(TOKEN)
 app = Flask(__name__)
 
+# ---------- تنظیمات کانال اجباری ----------
+# 👇 نام کاربری کانال خود را اینجا وارد کنید (با @ و بدون فاصله، مثال: "@my_channel")
+REQUIRED_CHANNEL = "@film 1"  # <--- این را به نام کانال خود تغییر دهید
+
 # ---------- لاگینگ برای بررسی خطاها ----------
 logging.basicConfig(level=logging.INFO)
 
-# ---------- مسیر Webhook (تلگرام درخواست‌ها را به این آدرس می‌فرستد) ----------
+# ---------- تابع بررسی عضویت در کانال ----------
+def is_user_member(user_id, channel_username):
+    try:
+        member = bot.get_chat_member(channel_username, user_id)
+        return member.status in ['member', 'administrator', 'creator']
+    except Exception as e:
+        logging.error(f"خطا در بررسی عضویت کاربر {user_id}: {e}")
+        return False
+
+# ---------- هندلر دستور start ----------
+@bot.message_handler(commands=['start'])
+def send_welcome(message):
+    user_id = message.from_user.id
+    # استخراج پارامتر (مثل film1)
+    try:
+        param = message.text.split()[1]
+    except IndexError:
+        param = None
+
+    # اگر کاربر عضو کانال نباشد
+    if not is_user_member(user_id, REQUIRED_CHANNEL):
+        markup = InlineKeyboardMarkup(row_width=1)
+        join_btn = InlineKeyboardButton(
+            text="🔹 عضویت در کانال",
+            url=f"https://t.me/{REQUIRED_CHANNEL[1:]}"
+        )
+        check_btn = InlineKeyboardButton(
+            text="✅ عضویت را بررسی کردم",
+            callback_data="check_membership"
+        )
+        markup.add(join_btn, check_btn)
+        bot.reply_to(
+            message,
+            f"🚫 برای دریافت فیلم، ابتدا باید در کانال زیر عضو شوید:\n👉 {REQUIRED_CHANNEL}",
+            reply_markup=markup,
+            parse_mode='Markdown'
+        )
+        return
+
+    # اگر کاربر عضو است و پارامتر معتبر دارد
+    # 👇 لطفاً File ID واقعی فیلم خود را اینجا قرار دهید
+    if param == "film1":
+        video_file_id = "BAACAgQAAxkBAAN6ah83R2alIdNXQwXLak9SK409wacAAv8yAAIxVvhQ2J09kYGhi4o7BA"
+        bot.send_video(message.chat.id, video_file_id, caption="🎬 فیلم درخواستی شما")
+    else:
+        bot.reply_to(message, "سلام! برای دریافت محتوا، روی لینک‌های داخل کانال کلیک کن.")
+
+# ---------- هندلر بررسی مجدد عضویت (Callback) ----------
+@bot.callback_query_handler(func=lambda call: True)
+def callback_handler(call):
+    if call.data == "check_membership":
+        user_id = call.from_user.id
+        if is_user_member(user_id, REQUIRED_CHANNEL):
+            bot.edit_message_text(
+                "✅ عضویت شما تأیید شد! در حال ارسال فیلم...",
+                chat_id=call.message.chat.id,
+                message_id=call.message.message_id
+            )
+            # 👇 لطفاً File ID واقعی فیلم خود را اینجا نیز قرار دهید
+            video_file_id = "BAACAgQAAxkBAAN6ah83R2alIdNXQwXLak9SK409wacAAv8yAAIxVvhQ2J09kYGhi4o7BA"
+            bot.send_video(call.message.chat.id, video_file_id, caption="🎬 فیلم درخواستی شما")
+        else:
+            bot.answer_callback_query(call.id, "❗️ شما هنوز عضو کانال نشده‌اید. لطفاً ابتدا عضو شوید.", show_alert=True)
+
+# ---------- مسیر Webhook (تلگرام درخواست‌ها را به اینجا می‌فرستد) ----------
 @app.route(f'/webhook/{TOKEN}', methods=['POST'])
 def webhook():
     try:
@@ -26,36 +95,22 @@ def webhook():
         logging.error(f"خطا در پردازش Webhook: {e}")
         return jsonify({"status": "error"}), 500
 
-# ---------- مسیر سلامت (برای Health Check Render و cron-job) ----------
+# ---------- مسیر سلامت برای Health Check Render ----------
 @app.route('/health', methods=['GET'])
 def health():
     return "OK", 200
 
-# ---------- مسیر اصلی (فقط برای نمایش) ----------
+# ---------- مسیر اصلی ----------
 @app.route('/', methods=['GET'])
 def index():
     return "ربات تلگرام با Webhook فعال است.", 200
 
-# ---------- دستورات ساده ربات (مثال) ----------
-@bot.message_handler(commands=['start'])
-def send_welcome(message):
-    bot.reply_to(message, "سلام! این ربات با Webhook کار می‌کند. 🚀")
-
-@bot.message_handler(func=lambda message: True)
-def echo_all(message):
-    bot.reply_to(message, message.text)
-
-# ---------- تابع تنظیم Webhook در تلگرام (در زمان اجرا) ----------
+# ---------- تابع تنظیم Webhook در تلگرام ----------
 def set_webhook():
-    # آدرس ربات در Render: https://your-app-name.onrender.com
-    # توجه: Render به شما آدرس می‌دهد. اینجا باید از متغیر محیطی یا آدرس ثابت استفاده کنید.
-    # در Render، آدرس به صورت خودکار در دسترس است. ما از آدرس نسبی استفاده می‌کنیم.
-    # اما برای تنظیم webhook، به آدرس کامل نیاز داریم. می‌توانید آن را از متغیر محیطی RENDER_EXTERNAL_URL بخوانید.
-    external_url = os.environ.get('RENDER_EXTERNAL_URL')  # Render این متغیر را خودکار می‌سازد
+    external_url = os.environ.get('RENDER_EXTERNAL_URL')
     if not external_url:
         logging.warning("RENDER_EXTERNAL_URL تنظیم نشده. Webhook تنظیم نمی‌شود.")
         return
-    
     webhook_url = f"{external_url}/webhook/{TOKEN}"
     result = bot.set_webhook(url=webhook_url)
     if result:
@@ -65,8 +120,6 @@ def set_webhook():
 
 # ---------- اجرای برنامه ----------
 if __name__ == '__main__':
-    # ابتدا webhook را تنظیم می‌کنیم
     set_webhook()
-    # سپس سرور Flask را راه می‌اندازیم
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
