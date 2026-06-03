@@ -14,7 +14,7 @@ app = Flask(__name__)
 
 # ---------- تنظیمات کانال اجباری ----------
 # 👇 نام کاربری کانال خود را اینجا وارد کنید (با @ و بدون فاصله، مثال: "@my_channel")
-REQUIRED_CHANNEL = "@film_01385"  # <--- این را به نام کانال خود تغییر دهید
+REQUIRED_CHANNEL = "@film01385"  # <--- این را به نام کانال خود تغییر دهید
 
 # ---------- لاگینگ برای بررسی خطاها ----------
 logging.basicConfig(level=logging.INFO)
@@ -60,7 +60,7 @@ def send_welcome(message):
 
     # اگر کاربر عضو است و پارامتر معتبر دارد
     # 👇 لطفاً File ID واقعی فیلم خود را اینجا قرار دهید
-    if param == "film_01385":
+    if param == "film01385":
         video_file_id = "BAACAgQAAxkBAAN6ah83R2alIdNXQwXLak9SK409wacAAv8yAAIxVvhQ2J09kYGhi4o7BA"
         bot.send_video(message.chat.id, video_file_id, caption="🎬 فیلم درخواستی شما")
     else:
