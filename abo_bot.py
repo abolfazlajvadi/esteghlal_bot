@@ -12,39 +12,64 @@ if not TOKEN:
 bot = telebot.TeleBot(TOKEN)
 app = Flask(__name__)
 
-# ---------- تنظیمات کانال اجباری ----------
-# 👇 نام کاربری کانال خود را اینجا وارد کنید (با @ و بدون فاصله، مثال: "@my_channel")
-REQUIRED_CHANNEL = "@film01385"  # <--- این را به نام کانال خود تغییر دهید
+# ---------- تنظیمات کانال‌ها ----------
+REQUIRED_CHANNEL = "@film01385"           # کانال اجباری (کاربر باید عضو بشه)
+STORAGE_CHANNEL = "@esteghlal01385" # 👈 کانال خصوصی برای ذخیره فیلم‌ها (یوزرنیم واقعی رو بذار)
 
-# ---------- لاگینگ برای بررسی خطاها ----------
+# ---------- دیکشنری فیلم‌ها (شناسه -> message_id) ----------
+# برای گرفتن message_id: فیلم رو در کانال خصوصی بفرست، سپس از ربات @get_id_bot استفاده کن
+FILMS = {
+    "film1": {
+        "message_id": 3,                    # 👈 عدد message_id واقعی رو بذار
+        "caption": "🎬 فیلم درخواستی شما"
+    }
+}
+
+# ---------- لاگینگ ----------
 logging.basicConfig(level=logging.INFO)
-@bot.channel_post_handler(func=lambda m: True)
-def channel_post(message):
-    print(f"MESSAGE ID = {message.message_id}")
-# ---------- تابع بررسی عضویت در کانال ----------
+
 # ---------- تابع بررسی عضویت در کانال ----------
 def is_user_member(user_id, channel_username):
     try:
         member = bot.get_chat_member(channel_username, user_id)
-        logging.info(f"MEMBER STATUS = {member.status}")
+        logging.info(f"MEMBER STATUS: {member.status}")
         return member.status in ['member', 'administrator', 'creator']
     except Exception as e:
         logging.error(f"MEMBERSHIP ERROR: {e}")
+        return False
+
+# ---------- تابع ارسال فیلم از کانال ذخیره ----------
+def send_film(chat_id, film_key):
+    film = FILMS.get(film_key)
+    if not film:
+        return False
+    try:
+        bot.forward_message(
+            chat_id=chat_id,
+            from_chat_id=STORAGE_CHANNEL,
+            message_id=film["message_id"]
+        )
+        if film.get("caption"):
+            bot.send_message(chat_id, film["caption"])
+        return True
+    except Exception as e:
+        logging.error(f"خطا در ارسال فیلم: {e}")
         return False
 
 # ---------- هندلر دستور start ----------
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     user_id = message.from_user.id
-    # استخراج پارامتر (مثل film1)
+    
+    # استخراج پارامتر از لینک (مثل ?start=film1)
     try:
         param = message.text.split()[1]
+        logging.info(f"PARAM received: {param}")
     except IndexError:
         param = None
-        logging.info(f"TEXT = {message.text}")
-        logging.info(f"PARAM = {param}")
+        logging.info("No parameter received")
 
-    # اگر کاربر عضو کانال نباشد
+    # بررسی عضویت در کانال اجباری
     if not is_user_member(user_id, REQUIRED_CHANNEL):
         markup = InlineKeyboardMarkup(row_width=1)
         join_btn = InlineKeyboardButton(
@@ -64,11 +89,9 @@ def send_welcome(message):
         )
         return
 
-    # اگر کاربر عضو است و پارامتر معتبر دارد
-    # 👇 لطفاً File ID واقعی فیلم خود را اینجا قرار دهید
-    if param == "film1":
-        video_file_id = "BAACAgQAAxkBAAEe9itqISYxZDWIhB_aD98MmW3avNnvAgACDSAAAvqhEFFIi255gLiQbTsE"
-        bot.send_video(message.chat.id, video_file_id, caption="🎬 فیلم درخواستی شما")
+    # اگر کاربر عضو است، فیلم را ارسال کن
+    if param and param in FILMS:
+        send_film(message.chat.id, param)
     else:
         bot.reply_to(message, "سلام! برای دریافت محتوا، روی لینک‌های داخل کانال کلیک کن.")
 
@@ -83,13 +106,13 @@ def callback_handler(call):
                 chat_id=call.message.chat.id,
                 message_id=call.message.message_id
             )
-            # 👇 لطفاً File ID واقعی فیلم خود را اینجا نیز قرار دهید
-            video_file_id = "BAACAgQAAxkBAAEe9itqISYxZDWIhB_aD98MmW3avNnvAgACDSAAAvqhEFFIi255gLiQbTsE"
-            bot.send_video(call.message.chat.id, video_file_id, caption="🎬 فیلم درخواستی شما")
+            # ارسال فیلم پیش‌فرض (اولین فیلم در دیکشنری)
+            first_film = next(iter(FILMS.keys()))
+            send_film(call.message.chat.id, first_film)
         else:
-            bot.answer_callback_query(call.id, "❗️ شما هنوز عضو کانال نشده‌اید. لطفاً ابتدا عضو شوید.", show_alert=True)
+            bot.answer_callback_query(call.id, "❗️ شما هنوز عضو کانال نشده‌اید.", show_alert=True)
 
-# ---------- مسیر Webhook (تلگرام درخواست‌ها را به اینجا می‌فرستد) ----------
+# ---------- مسیر Webhook ----------
 @app.route(f'/webhook/{TOKEN}', methods=['POST'])
 def webhook():
     try:
@@ -98,10 +121,10 @@ def webhook():
         bot.process_new_updates([update])
         return jsonify({"status": "ok"}), 200
     except Exception as e:
-        logging.error(f"خطا در پردازش Webhook: {e}")
+        logging.error(f"Webhook error: {e}")
         return jsonify({"status": "error"}), 500
 
-# ---------- مسیر سلامت برای Health Check Render ----------
+# ---------- مسیر سلامت برای Render ----------
 @app.route('/health', methods=['GET'])
 def health():
     return "OK", 200
@@ -111,20 +134,20 @@ def health():
 def index():
     return "ربات تلگرام با Webhook فعال است.", 200
 
-# ---------- تابع تنظیم Webhook در تلگرام ----------
+# ---------- تنظیم Webhook ----------
 def set_webhook():
     external_url = os.environ.get('RENDER_EXTERNAL_URL')
     if not external_url:
-        logging.warning("RENDER_EXTERNAL_URL تنظیم نشده. Webhook تنظیم نمی‌شود.")
+        logging.warning("RENDER_EXTERNAL_URL not set")
         return
     webhook_url = f"{external_url}/webhook/{TOKEN}"
     result = bot.set_webhook(url=webhook_url)
     if result:
-        logging.info(f"Webhook با موفقیت تنظیم شد: {webhook_url}")
+        logging.info(f"Webhook set: {webhook_url}")
     else:
-        logging.error("تنظیم Webhook ناموفق بود")
+        logging.error("Failed to set webhook")
 
-# ---------- اجرای برنامه ----------
+# ---------- اجرا ----------
 if __name__ == '__main__':
     set_webhook()
     port = int(os.environ.get('PORT', 5000))
