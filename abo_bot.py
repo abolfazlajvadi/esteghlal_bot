@@ -33,7 +33,8 @@ def send_welcome(message):
         param = message.text.split()[1]
     except IndexError:
         param = None
-
+logging.info(f"TEXT = {message.text}")
+logging.info(f"PARAM = {param}")
     # اگر کاربر عضو کانال نباشد
     if not is_user_member(user_id, REQUIRED_CHANNEL):
         markup = InlineKeyboardMarkup(row_width=1)
