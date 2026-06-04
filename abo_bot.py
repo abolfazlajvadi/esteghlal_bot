@@ -64,16 +64,11 @@ def send_welcome(message):
 
     # اگر کاربر عضو است و پارامتر معتبر دارد
     # 👇 لطفاً File ID واقعی فیلم خود را اینجا قرار دهید
-    logging.info("REACHED PARAM CHECK")
- if param == "film1":
-    try:
-        bot.send_video(
-            message.chat.id,
-            "BAACAgQAAxkBAAEe9itqISYxZDWIhB_aD98MmW3avNnvAgACDSAAAvqhEFFIi255gLiQbTsE",
-            caption="🎬 فیلم درخواستی شما"
-        )
-    except Exception as e:
-        logging.error(f"SEND VIDEO ERROR: {e}")
+    if param == "film1":
+        video_file_id = "BAACAgQAAxkBAAEe9itqISYxZDWIhB_aD98MmW3avNnvAgACDSAAAvqhEFFIi255gLiQbTsE"
+        bot.send_video(message.chat.id, video_file_id, caption="🎬 فیلم درخواستی شما")
+    else:
+        bot.reply_to(message, "سلام! برای دریافت محتوا، روی لینک‌های داخل کانال کلیک کن.")
 
 # ---------- هندلر بررسی مجدد عضویت (Callback) ----------
 @bot.callback_query_handler(func=lambda call: True)
