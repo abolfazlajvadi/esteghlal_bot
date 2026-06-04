@@ -1,5 +1,6 @@
 import os
 import logging
+import threading
 from flask import Flask, request, jsonify
 import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -13,14 +14,13 @@ bot = telebot.TeleBot(TOKEN)
 app = Flask(__name__)
 
 # ---------- تنظیمات کانال‌ها ----------
-REQUIRED_CHANNEL = "@film01385"           # کانال اجباری (کاربر باید عضو بشه)
-STORAGE_CHANNEL = "@esteghlal01385" # 👈 کانال خصوصی برای ذخیره فیلم‌ها (یوزرنیم واقعی رو بذار)
+REQUIRED_CHANNEL = "@film01385"           # کانال اجباری
+STORAGE_CHANNEL = "@esteghlal01385" # 👈 کانال خصوصی برای ذخیره فیلم‌ها
 
-# ---------- دیکشنری فیلم‌ها (شناسه -> message_id) ----------
-# برای گرفتن message_id: فیلم رو در کانال خصوصی بفرست، سپس از ربات @get_id_bot استفاده کن
+# ---------- دیکشنری فیلم‌ها ----------
 FILMS = {
     "film1": {
-        "message_id": 3,                    # 👈 عدد message_id واقعی رو بذار
+        "message_id": 3,                    # 👈 message_id واقعی فیلم
         "caption": "🎬 فیلم درخواستی شما"
     }
 }
@@ -28,32 +28,58 @@ FILMS = {
 # ---------- لاگینگ ----------
 logging.basicConfig(level=logging.INFO)
 
-# ---------- تابع بررسی عضویت در کانال ----------
-def is_user_member(user_id, channel_username):
-    try:
-        member = bot.get_chat_member(channel_username, user_id)
-        logging.info(f"MEMBER STATUS: {member.status}")
-        return member.status in ['member', 'administrator', 'creator']
-    except Exception as e:
-        logging.error(f"MEMBERSHIP ERROR: {e}")
-        return False
+# ========== تابع حذف پیام بعد از ۲۰ ثانیه ==========
+def delete_message_after_delay(chat_id, message_id, delay=20):
+    """پیام رو بعد از delay ثانیه حذف می‌کنه"""
+    def delete():
+        try:
+            bot.delete_message(chat_id, message_id)
+            logging.info(f"Message {message_id} deleted after {delay} seconds")
+        except Exception as e:
+            logging.error(f"Failed to delete message: {e}")
+    timer = threading.Timer(delay, delete)
+    timer.daemon = True
+    timer.start()
 
-# ---------- تابع ارسال فیلم از کانال ذخیره ----------
-def send_film(chat_id, film_key):
+# ---------- تابع ارسال فیلم با تایمر حذف ----------
+def send_film_with_timer(chat_id, film_key):
     film = FILMS.get(film_key)
     if not film:
+        bot.send_message(chat_id, "❌ فیلم مورد نظر یافت نشد.")
         return False
+    
     try:
-        bot.forward_message(
+        # فوروارد کردن فیلم از کانال ذخیره
+        forwarded = bot.forward_message(
             chat_id=chat_id,
             from_chat_id=STORAGE_CHANNEL,
             message_id=film["message_id"]
         )
-        if film.get("caption"):
-            bot.send_message(chat_id, film["caption"])
+        
+        # پیام هشدار با تایمر
+        warning_msg = bot.send_message(
+            chat_id,
+            f"⚠️ این فیلم تا {20} ثانیه دیگر حذف می‌شود.\n"
+            "لطفاً برای نگهداری، آن را **سیو** یا **فوروارد** کنید، سپس دانلود کنید."
+        )
+        
+        # حذف فیلم و پیام هشدار بعد از ۲۰ ثانیه
+        delete_message_after_delay(chat_id, forwarded.message_id, delay=20)
+        delete_message_after_delay(chat_id, warning_msg.message_id, delay=20)
+        
         return True
     except Exception as e:
-        logging.error(f"خطا در ارسال فیلم: {e}")
+        logging.error(f"Error sending film: {e}")
+        bot.send_message(chat_id, "❌ خطا در ارسال فیلم.")
+        return False
+
+# ---------- تابع بررسی عضویت ----------
+def is_user_member(user_id, channel_username):
+    try:
+        member = bot.get_chat_member(channel_username, user_id)
+        return member.status in ['member', 'administrator', 'creator']
+    except Exception as e:
+        logging.error(f"Membership error: {e}")
         return False
 
 # ---------- هندلر دستور start ----------
@@ -61,58 +87,54 @@ def send_film(chat_id, film_key):
 def send_welcome(message):
     user_id = message.from_user.id
     
-    # استخراج پارامتر از لینک (مثل ?start=film1)
     try:
         param = message.text.split()[1]
-        logging.info(f"PARAM received: {param}")
+        logging.info(f"Param received: {param}")
     except IndexError:
         param = None
-        logging.info("No parameter received")
-
-    # بررسی عضویت در کانال اجباری
+    
+    # بررسی عضویت
     if not is_user_member(user_id, REQUIRED_CHANNEL):
         markup = InlineKeyboardMarkup(row_width=1)
         join_btn = InlineKeyboardButton(
-            text="🔹 عضویت در کانال",
+            "🔹 عضویت در کانال",
             url=f"https://t.me/{REQUIRED_CHANNEL[1:]}"
         )
         check_btn = InlineKeyboardButton(
-            text="✅ عضویت را بررسی کردم",
+            "✅ عضویت را بررسی کردم",
             callback_data="check_membership"
         )
         markup.add(join_btn, check_btn)
         bot.reply_to(
             message,
-            f"🚫 برای دریافت فیلم، ابتدا باید در کانال زیر عضو شوید:\n👉 {REQUIRED_CHANNEL}",
-            reply_markup=markup,
-            parse_mode='Markdown'
+            f"🚫 برای دریافت فیلم، ابتدا در کانال {REQUIRED_CHANNEL} عضو شوید.",
+            reply_markup=markup
         )
         return
-
-    # اگر کاربر عضو است، فیلم را ارسال کن
+    
+    # ارسال فیلم با تایمر
     if param and param in FILMS:
-        send_film(message.chat.id, param)
+        send_film_with_timer(message.chat.id, param)
     else:
-        bot.reply_to(message, "سلام! برای دریافت محتوا، روی لینک‌های داخل کانال کلیک کن.")
+        bot.reply_to(message, "سلام! برای دریافت فیلم، روی لینک‌های داخل کانال کلیک کن.")
 
-# ---------- هندلر بررسی مجدد عضویت (Callback) ----------
+# ---------- هندلر دکمه بررسی عضویت ----------
 @bot.callback_query_handler(func=lambda call: True)
 def callback_handler(call):
     if call.data == "check_membership":
         user_id = call.from_user.id
         if is_user_member(user_id, REQUIRED_CHANNEL):
             bot.edit_message_text(
-                "✅ عضویت شما تأیید شد! در حال ارسال فیلم...",
-                chat_id=call.message.chat.id,
-                message_id=call.message.message_id
+                "✅ عضویت تأیید شد! در حال ارسال فیلم...",
+                call.message.chat.id,
+                call.message.message_id
             )
-            # ارسال فیلم پیش‌فرض (اولین فیلم در دیکشنری)
             first_film = next(iter(FILMS.keys()))
-            send_film(call.message.chat.id, first_film)
+            send_film_with_timer(call.message.chat.id, first_film)
         else:
-            bot.answer_callback_query(call.id, "❗️ شما هنوز عضو کانال نشده‌اید.", show_alert=True)
+            bot.answer_callback_query(call.id, "❗️ هنوز عضو نشده‌اید.", show_alert=True)
 
-# ---------- مسیر Webhook ----------
+# ---------- Webhook و بقیه قسمت‌ها ----------
 @app.route(f'/webhook/{TOKEN}', methods=['POST'])
 def webhook():
     try:
@@ -124,17 +146,14 @@ def webhook():
         logging.error(f"Webhook error: {e}")
         return jsonify({"status": "error"}), 500
 
-# ---------- مسیر سلامت برای Render ----------
 @app.route('/health', methods=['GET'])
 def health():
     return "OK", 200
 
-# ---------- مسیر اصلی ----------
 @app.route('/', methods=['GET'])
 def index():
-    return "ربات تلگرام با Webhook فعال است.", 200
+    return "ربات تلگرام فعال است.", 200
 
-# ---------- تنظیم Webhook ----------
 def set_webhook():
     external_url = os.environ.get('RENDER_EXTERNAL_URL')
     if not external_url:
@@ -147,7 +166,6 @@ def set_webhook():
     else:
         logging.error("Failed to set webhook")
 
-# ---------- اجرا ----------
 if __name__ == '__main__':
     set_webhook()
     port = int(os.environ.get('PORT', 5000))
