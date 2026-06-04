@@ -43,7 +43,7 @@ def send_welcome(message):
         markup = InlineKeyboardMarkup(row_width=1)
         join_btn = InlineKeyboardButton(
             text="🔹 عضویت در کانال",
-            url=f"https://t.me/{REQUIRED_CHANNEL}"
+            url=f"https://t.me/{REQUIRED_CHANNEL[1:]}"
         )
         check_btn = InlineKeyboardButton(
             text="✅ عضویت را بررسی کردم",
@@ -61,7 +61,7 @@ def send_welcome(message):
     # اگر کاربر عضو است و پارامتر معتبر دارد
     # 👇 لطفاً File ID واقعی فیلم خود را اینجا قرار دهید
     if param == "abc":
-        video_file_id = "BAACAgQAAxkBAAN6ah83R2alIdNXQwXLak9SK409wacAAv8yAAIxVvhQ2J09kYGhi4o7BA"
+        video_file_id = "BAACAgQAAxkBAAEe9itqISYxZDWIhB_aD98MmW3avNnvAgACDSAAAvqhEFFIi255gLiQbTsE"
         bot.send_video(message.chat.id, video_file_id, caption="🎬 فیلم درخواستی شما")
     else:
         bot.reply_to(message, "سلام! برای دریافت محتوا، روی لینک‌های داخل کانال کلیک کن.")
@@ -78,7 +78,7 @@ def callback_handler(call):
                 message_id=call.message.message_id
             )
             # 👇 لطفاً File ID واقعی فیلم خود را اینجا نیز قرار دهید
-            video_file_id = "BAACAgQAAxkBAAN6ah83R2alIdNXQwXLak9SK409wacAAv8yAAIxVvhQ2J09kYGhi4o7BA"
+            video_file_id = "BAACAgQAAxkBAAEe9itqISYxZDWIhB_aD98MmW3avNnvAgACDSAAAvqhEFFIi255gLiQbTsE"
             bot.send_video(call.message.chat.id, video_file_id, caption="🎬 فیلم درخواستی شما")
         else:
             bot.answer_callback_query(call.id, "❗️ شما هنوز عضو کانال نشده‌اید. لطفاً ابتدا عضو شوید.", show_alert=True)
