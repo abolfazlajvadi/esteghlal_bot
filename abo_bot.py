@@ -128,7 +128,7 @@ def send_welcome(message):
     else:
         bot.reply_to(message, "سلام! برای دریافت فیلم، روی لینک‌های داخل کانال کلیک کن.")
 
-# ---------- هندلر دکمه بررسی عضویت (نسخه جدید - بدون ارسال خودکار فیلم) ----------
+# ---------- هندلر دکمه بررسی عضویت ----------
 @bot.callback_query_handler(func=lambda call: True)
 def callback_handler(call):
     if call.data == "check_membership":
@@ -136,12 +136,9 @@ def callback_handler(call):
         chat_id = call.message.chat.id
         
         if is_user_member(user_id, REQUIRED_CHANNEL):
-            # دریافت فیلم درخواستی کاربر از دیکشنری
-            requested_film = user_requested_film.get(chat_id, "film1")
-            
-            # فقط پیام تأیید عضویت رو ویرایش می‌کنیم، فیلم نمی‌فرستیم
+            # فقط پیام تأیید عضویت (بدون هیچ لینک یا دکمه‌ای)
             bot.edit_message_text(
-                f"✅ عضویت شما تأیید شد!\n\n"
+                "✅ عضویت شما تأیید شد!",
                 chat_id,
                 call.message.message_id
             )
