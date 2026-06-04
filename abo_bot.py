@@ -22,7 +22,13 @@ logging.basicConfig(level=logging.INFO)
 # ---------- تابع بررسی عضویت در کانال ----------
 # ---------- تابع بررسی عضویت در کانال ----------
 def is_user_member(user_id, channel_username):
-    return True
+    try:
+        member = bot.get_chat_member(channel_username, user_id)
+        logging.info(f"MEMBER STATUS = {member.status}")
+        return member.status in ['member', 'administrator', 'creator']
+    except Exception as e:
+        logging.error(f"MEMBERSHIP ERROR: {e}")
+        return False
 
 # ---------- هندلر دستور start ----------
 @bot.message_handler(commands=['start'])
@@ -33,8 +39,9 @@ def send_welcome(message):
         param = message.text.split()[1]
     except IndexError:
         param = None
-    logging.info(f"TEXT = {message.text}")
-    logging.info(f"PARAM = {param}")
+        logging.info(f"TEXT = {message.text}")
+        logging.info(f"PARAM = {param}")
+
     # اگر کاربر عضو کانال نباشد
     if not is_user_member(user_id, REQUIRED_CHANNEL):
         markup = InlineKeyboardMarkup(row_width=1)
