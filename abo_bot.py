@@ -128,7 +128,7 @@ def send_welcome(message):
     else:
         bot.reply_to(message, "سلام! برای دریافت فیلم، روی لینک‌های داخل کانال کلیک کن.")
 
-# ---------- هندلر دکمه بررسی عضویت ----------
+# ---------- هندلر دکمه بررسی عضویت (نسخه جدید - بدون ارسال خودکار فیلم) ----------
 @bot.callback_query_handler(func=lambda call: True)
 def callback_handler(call):
     if call.data == "check_membership":
@@ -136,25 +136,20 @@ def callback_handler(call):
         chat_id = call.message.chat.id
         
         if is_user_member(user_id, REQUIRED_CHANNEL):
+            # دریافت فیلم درخواستی کاربر از دیکشنری
+            requested_film = user_requested_film.get(chat_id, "film1")
+            
+            # فقط پیام تأیید عضویت رو ویرایش می‌کنیم، فیلم نمی‌فرستیم
             bot.edit_message_text(
-                "✅ عضویت تأیید شد! در حال ارسال فیلم...",
+                f"✅ عضویت شما تأیید شد!\n\n"
+                f"🎬 برای دریافت فیلم، لطفاً روی لینک زیر کلیک کنید:\n"
+                f"https://t.me/{bot.get_me().username}?start={requested_film}",
                 chat_id,
                 call.message.message_id
             )
-            
-            # گرفتن فیلم درخواستی کاربر از دیکشنری
-            requested_film = user_requested_film.get(chat_id)
-            
-            if requested_film and requested_film in FILMS:
-                # ارسال فیلم درخواستی
-                send_film_with_timer(chat_id, requested_film)
-                # پاک کردن دیکشنری برای این کاربر (اختیاری)
-                if chat_id in user_requested_film:
-                    del user_requested_film[chat_id]
-            else:
-                # اگه به هر دلیلی فیلم درخواستی پیدا نشد، فیلم پیش‌فرض بفرست
-                first_film = next(iter(FILMS.keys()))
-                send_film_with_timer(chat_id, first_film)
+            # پاک کردن دیکشنری برای این کاربر
+            if chat_id in user_requested_film:
+                del user_requested_film[chat_id]
         else:
             bot.answer_callback_query(call.id, "❗️ شما هنوز عضو کانال نشده‌اید.", show_alert=True)
 
