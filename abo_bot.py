@@ -13,14 +13,17 @@ if not TOKEN:
 bot = telebot.TeleBot(TOKEN)
 app = Flask(__name__)
 
+# ---------- دیکشنری برای نگهداری فیلم درخواستی هر کاربر ----------
+user_requested_film = {}
+
 # ---------- تنظیمات کانال‌ها ----------
 REQUIRED_CHANNEL = "@film01385"           # کانال اجباری
-STORAGE_CHANNEL = "@esteghlal01385" # 👈 کانال خصوصی برای ذخیره فیلم‌ها
+STORAGE_CHANNEL = "@esteghlal01385"       # کانال خصوصی برای ذخیره فیلم‌ها
 
 # ---------- دیکشنری فیلم‌ها ----------
 FILMS = {
     "film1": {
-        "message_id": 3,                    # 👈 message_id واقعی فیلم
+        "message_id": 3,                    # message_id واقعی فیلم
         "caption": "🎬 فیلم درخواستی شما"
     }
 }
@@ -86,14 +89,21 @@ def is_user_member(user_id, channel_username):
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     user_id = message.from_user.id
+    chat_id = message.chat.id
     
+    # استخراج پارامتر از لینک
     try:
         param = message.text.split()[1]
         logging.info(f"Param received: {param}")
     except IndexError:
         param = None
     
-    # بررسی عضویت
+    # ذخیره کردن فیلم درخواستی کاربر (اگه پارامتر داشته باشه)
+    if param:
+        user_requested_film[chat_id] = param
+        logging.info(f"Saved requested film for user {chat_id}: {param}")
+    
+    # بررسی عضویت در کانال اجباری
     if not is_user_member(user_id, REQUIRED_CHANNEL):
         markup = InlineKeyboardMarkup(row_width=1)
         join_btn = InlineKeyboardButton(
@@ -112,9 +122,9 @@ def send_welcome(message):
         )
         return
     
-    # ارسال فیلم با تایمر
+    # اگر کاربر قبلاً عضو کانال بود، مستقیم فیلم درخواستی رو بفرست
     if param and param in FILMS:
-        send_film_with_timer(message.chat.id, param)
+        send_film_with_timer(chat_id, param)
     else:
         bot.reply_to(message, "سلام! برای دریافت فیلم، روی لینک‌های داخل کانال کلیک کن.")
 
@@ -123,16 +133,30 @@ def send_welcome(message):
 def callback_handler(call):
     if call.data == "check_membership":
         user_id = call.from_user.id
+        chat_id = call.message.chat.id
+        
         if is_user_member(user_id, REQUIRED_CHANNEL):
             bot.edit_message_text(
                 "✅ عضویت تأیید شد! در حال ارسال فیلم...",
-                call.message.chat.id,
+                chat_id,
                 call.message.message_id
             )
-            first_film = next(iter(FILMS.keys()))
-            send_film_with_timer(call.message.chat.id, first_film)
+            
+            # گرفتن فیلم درخواستی کاربر از دیکشنری
+            requested_film = user_requested_film.get(chat_id)
+            
+            if requested_film and requested_film in FILMS:
+                # ارسال فیلم درخواستی
+                send_film_with_timer(chat_id, requested_film)
+                # پاک کردن دیکشنری برای این کاربر (اختیاری)
+                if chat_id in user_requested_film:
+                    del user_requested_film[chat_id]
+            else:
+                # اگه به هر دلیلی فیلم درخواستی پیدا نشد، فیلم پیش‌فرض بفرست
+                first_film = next(iter(FILMS.keys()))
+                send_film_with_timer(chat_id, first_film)
         else:
-            bot.answer_callback_query(call.id, "❗️ هنوز عضو نشده‌اید.", show_alert=True)
+            bot.answer_callback_query(call.id, "❗️ شما هنوز عضو کانال نشده‌اید.", show_alert=True)
 
 # ---------- Webhook و بقیه قسمت‌ها ----------
 @app.route(f'/webhook/{TOKEN}', methods=['POST'])
