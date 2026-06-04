@@ -14,7 +14,7 @@ app = Flask(__name__)
 
 # ---------- تنظیمات کانال اجباری ----------
 # 👇 نام کاربری کانال خود را اینجا وارد کنید (با @ و بدون فاصله، مثال: "@my_channel")
-REQUIRED_CHANNEL = "film01385"  # <--- این را به نام کانال خود تغییر دهید
+REQUIRED_CHANNEL = "@film01385"  # <--- این را به نام کانال خود تغییر دهید
 
 # ---------- لاگینگ برای بررسی خطاها ----------
 logging.basicConfig(level=logging.INFO)
@@ -43,7 +43,7 @@ def send_welcome(message):
         markup = InlineKeyboardMarkup(row_width=1)
         join_btn = InlineKeyboardButton(
             text="🔹 عضویت در کانال",
-            url=f"https://t.me/{REQUIRED_CHANNEL[1:]}"
+            url=f"https://t.me/{REQUIRED_CHANNEL}"
         )
         check_btn = InlineKeyboardButton(
             text="✅ عضویت را بررسی کردم",
