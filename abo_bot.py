@@ -142,8 +142,6 @@ def callback_handler(call):
             # فقط پیام تأیید عضویت رو ویرایش می‌کنیم، فیلم نمی‌فرستیم
             bot.edit_message_text(
                 f"✅ عضویت شما تأیید شد!\n\n"
-                f"🎬 برای دریافت فیلم، لطفاً روی لینک مورد نظر  کلیک کنید:\n"
-           
                 chat_id,
                 call.message.message_id
             )
