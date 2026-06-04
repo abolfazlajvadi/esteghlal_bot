@@ -60,7 +60,7 @@ def send_welcome(message):
 
     # اگر کاربر عضو است و پارامتر معتبر دارد
     # 👇 لطفاً File ID واقعی فیلم خود را اینجا قرار دهید
-    if param == "film01385":
+    if param == "abc":
         video_file_id = "BAACAgQAAxkBAAN6ah83R2alIdNXQwXLak9SK409wacAAv8yAAIxVvhQ2J09kYGhi4o7BA"
         bot.send_video(message.chat.id, video_file_id, caption="🎬 فیلم درخواستی شما")
     else:
