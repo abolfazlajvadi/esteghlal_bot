@@ -44,7 +44,7 @@ def delete_message_after_delay(chat_id, message_id, delay=20):
     timer.daemon = True
     timer.start()
 
-# ---------- تابع ارسال فیلم با تایمر حذف ----------
+# ========== تابع ارسال فیلم با copy_message (بدون نمایش منبع) ==========
 def send_film_with_timer(chat_id, film_key):
     film = FILMS.get(film_key)
     if not film:
@@ -52,8 +52,8 @@ def send_film_with_timer(chat_id, film_key):
         return False
     
     try:
-        # فوروارد کردن فیلم از کانال ذخیره
-        forwarded = bot.forward_message(
+        # استفاده از copy_message به جای forward_message
+        copied = bot.copy_message(
             chat_id=chat_id,
             from_chat_id=STORAGE_CHANNEL,
             message_id=film["message_id"]
@@ -67,7 +67,7 @@ def send_film_with_timer(chat_id, film_key):
         )
         
         # حذف فیلم و پیام هشدار بعد از ۲۰ ثانیه
-        delete_message_after_delay(chat_id, forwarded.message_id, delay=20)
+        delete_message_after_delay(chat_id, copied.message_id, delay=20)
         delete_message_after_delay(chat_id, warning_msg.message_id, delay=20)
         
         return True
@@ -128,7 +128,6 @@ def send_welcome(message):
     else:
         bot.reply_to(message, "سلام! برای دریافت فیلم، روی لینک‌های داخل کانال کلیک کن.")
 
-# ---------- هندلر دکمه بررسی عضویت ----------
 # ---------- هندلر دکمه بررسی عضویت ----------
 @bot.callback_query_handler(func=lambda call: True)
 def callback_handler(call):
