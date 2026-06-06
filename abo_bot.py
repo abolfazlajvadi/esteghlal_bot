@@ -26,6 +26,10 @@ FILMS = {
         "message_id": 4,                    # message_id واقعی فیلم
         "caption": "🎬 فیلم درخواستی شما"
     }
+        "film2": {
+        "message_id": 5,                    # message_id واقعی فیلم
+        "caption": "🎬 فیلم درخواستی شما"
+    }
 }
 
 # ---------- لاگینگ ----------
